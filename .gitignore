@@ -1,0 +1,20 @@
+# Environment variables with secrets
+.env
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Data directories (contain user data, models, and configs)
+data/
+
+# VS Code settings
+.vscode/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
