@@ -25,24 +25,24 @@ This project provides a containerized environment for building AI-powered workfl
 ### Quick Start
 
 1. **Clone or navigate to the project directory:**
-  
+  ```bash
    cd /Users/robertomagallanes/Developer/Docker/n8nTest
-  
+  ```
 
 2. **Create environment variables (optional but recommended):**
-  
+  ```bash
    export POSTGRES_USER=n8n
    export POSTGRES_PASSWORD=your_secure_password
    export N8N_BASIC_AUTH_USER=admin
    export N8N_BASIC_AUTH_PASSWORD=your_secure_password
    export WEBUI_SECRET_KEY=your_secret_key
    export TIMEZONE=America/Los_Angeles
-   
+   ```
 
 3. **Start all services:**
-   
+   ```bash
    docker-compose up -d
-  
+  ```
 
 4. **Access the services:**
    - n8n: http://localhost:5678
