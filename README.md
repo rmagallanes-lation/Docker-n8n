@@ -49,6 +49,47 @@ This project provides a containerized environment for building AI-powered workfl
    - OpenWebUI: http://localhost:3000
    - Ollama API: http://localhost:11434
 
+## Cloudflare Tunnel
+
+Quick tunnel creates a temporary, short-lived public URL that forwards traffic to your local n8n instance — great for testing webhooks but not for production (URLs change on restart).
+
+### Install
+- macOS (install Docker + cloudflared in one line)
+```bash
+brew install --cask docker && brew install cloudflared
+```
+- Linux (download binary)
+```bash
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared && chmod +x cloudflared && sudo mv cloudflared /usr/local/bin/
+```
+
+### Start stack & view cloudflared logs
+```bash
+# start the docker stack
+docker compose up -d
+
+# view cloudflared logs (service name: cloudflared)
+docker compose logs -f cloudflared
+```
+
+### Run cloudflared
+- Locally (quick tunnel; returns a temporary public URL)
+```bash
+cloudflared tunnel --url http://localhost:5678
+```
+- With docker-compose (if a `cloudflared` service is defined)
+```bash
+docker compose up -d cloudflared
+docker compose logs -f cloudflared
+```
+
+### .env & webhooks
+- Set `N8N_HOST=localhost` in your `.env` so n8n builds webhook URLs for the local host:
+```env
+N8N_HOST=localhost
+```
+- Note: quick tunnels are ephemeral — webhook URLs change when the tunnel restarts. Use a persistent Cloudflare Tunnel (authenticated tunnel) for stable webhook endpoints in production.
+
 ## Development Setup
 
 ### Environment Variables
