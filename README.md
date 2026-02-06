@@ -50,45 +50,60 @@ This project provides a containerized environment for building AI-powered workfl
    - Ollama API: http://localhost:11434
 
 ## Cloudflare Tunnel
+Quick tunnels create a temporary, short-lived public URL that forwards traffic to your local n8n instance — great for ad-hoc testing, but NOT suitable for production webhooks because the URL changes when the tunnel restarts.
 
-Quick tunnel creates a temporary, short-lived public URL that forwards traffic to your local n8n instance — great for testing webhooks but not for production (URLs change on restart).
+This project includes a `cloudflared` service in `docker-compose.yml` that can run a persistent (named) Cloudflare Tunnel. The recommended flow for production-like stability is:
 
-### Install
-- macOS (install Docker + cloudflared in one line)
+1. Create a named tunnel locally (requires Cloudflare account access):
+
 ```bash
-brew install --cask docker && brew install cloudflared
-```
-- Linux (download binary)
-```bash
-curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared && chmod +x cloudflared && sudo mv cloudflared /usr/local/bin/
+# create a named tunnel and capture the generated tunnel id
+cloudflared tunnel create n8n-tunnel
 ```
 
-### Start stack & view cloudflared logs
-```bash
-# start the docker stack
-docker compose up -d
+2. Copy the generated credentials JSON into the project folder (local-only):
 
-# view cloudflared logs (service name: cloudflared)
+```bash
+# create the folder and copy the credentials file produced by the create step
+mkdir -p .cloudflared
+# move or copy ~/.cloudflared/<TUNNEL-UUID>.json -> .cloudflared/
+```
+
+3. Create a tunnel config file (use the provided template `.cloudflared/config.yml.template`):
+
+```yaml
+# .cloudflared/config.yml (example)
+tunnel: <TUNNEL-UUID>
+credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
+ingress:
+  - hostname: n8n.lation.com.mx
+    service: http://n8n:5678
+  - service: http_status: 404
+```
+
+4. Start the `cloudflared` container (the service mounts `.cloudflared` at `/etc/cloudflared`):
+
+```bash
+docker compose up -d cloudflared n8n
 docker compose logs -f cloudflared
 ```
 
-### Run cloudflared
-- Locally (quick tunnel; returns a temporary public URL)
-```bash
-cloudflared tunnel --url http://localhost:5678
-```
-- With docker-compose (if a `cloudflared` service is defined)
-```bash
-docker compose up -d cloudflared
-docker compose logs -f cloudflared
-```
+5. In the Cloudflare dashboard DNS for `lation.com.mx` create a CNAME for the hostname you want to expose (for example `n8n`) and point it to the tunnel target shown by `cloudflared` (usually `<tunnel-uuid>.cfargotunnel.com`). Follow the Cloudflare docs for mapping a tunnel to a hostname if you prefer the UI.
 
-### .env & webhooks
-- Set `N8N_HOST=localhost` in your `.env` so n8n builds webhook URLs for the local host:
+6. Update your `.env` so n8n builds stable webhook URLs (example):
+
 ```env
-N8N_HOST=localhost
+N8N_PROTOCOL=https
+N8N_HOST=n8n.lation.com.mx
+WEBHOOK_URL=https://n8n.lation.com.mx/
 ```
-- Note: quick tunnels are ephemeral — webhook URLs change when the tunnel restarts. Use a persistent Cloudflare Tunnel (authenticated tunnel) for stable webhook endpoints in production.
+
+Security notes:
+- Keep `.cloudflared/` and credentials out of git (this repo already gitignores `.cloudflared`).
+- Protect `n8n.lation.com.mx` with Cloudflare Access (Zero Trust) and keep n8n basic auth enabled for defense-in-depth.
+- Avoid exposing database ports (Postgres) to the public host in production.
+
+See `.cloudflared/config.yml.template` for a starting config. Do NOT commit your actual credentials JSON into the repository.
 
 ## Development Setup
 

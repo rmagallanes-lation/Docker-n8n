@@ -70,10 +70,16 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared-tunnel
-    command: tunnel --no-autoupdate --url http://n8n:5678
+    # Use a named persistent tunnel. Place the Tunnel credentials and config
+    # in the local .cloudflared/ directory (gitignored) and mount it into
+    # the container at /etc/cloudflared. The tunnel is run by name so the
+    # container reads the config/credentials from the mounted folder.
+    command: tunnel run n8n-tunnel
     depends_on:
       - n8n
     restart: unless-stopped
+    volumes:
+      - ./.cloudflared:/etc/cloudflared:ro
     networks: [stack-ai]
     logging:
       driver: "json-file"
