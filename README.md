@@ -50,60 +50,47 @@ This project provides a containerized environment for building AI-powered workfl
    - Ollama API: http://localhost:11434
 
 ## Cloudflare Tunnel
-Quick tunnels create a temporary, short-lived public URL that forwards traffic to your local n8n instance — great for ad-hoc testing, but NOT suitable for production webhooks because the URL changes when the tunnel restarts.
+This stack uses a token-based Cloudflare Tunnel via Docker (`cloudflared`) to publish n8n with two hostnames:
 
-This project includes a `cloudflared` service in `docker-compose.yml` that can run a persistent (named) Cloudflare Tunnel. The recommended flow for production-like stability is:
+- `n8n-admin.lation.com.mx` -> n8n editor/login (protect with Cloudflare Access + n8n basic auth)
+- `n8n.lation.com.mx` -> n8n webhook endpoint host (public for webhook traffic)
 
-1. Create a named tunnel locally (requires Cloudflare account access):
+### Setup Steps (Cloudflare Dashboard + Docker)
 
-```bash
-# create a named tunnel and capture the generated tunnel id
-cloudflared tunnel create n8n-tunnel
+1. Create a new tunnel in Cloudflare Zero Trust (recommended name: `n8n-lation-prod`).
+2. Choose Docker connector and copy the generated token.
+3. Configure public hostnames in the tunnel:
+   - `n8n-admin.lation.com.mx` -> `http://n8n:5678`
+   - `n8n.lation.com.mx` -> `http://n8n:5678`
+4. Put the token in `.env`:
+
+```env
+CF_TUNNEL_TOKEN=replace_with_cloudflare_tunnel_token
 ```
 
-2. Copy the generated credentials JSON into the project folder (local-only):
+5. Start services:
 
 ```bash
-# create the folder and copy the credentials file produced by the create step
-mkdir -p .cloudflared
-# move or copy ~/.cloudflared/<TUNNEL-UUID>.json -> .cloudflared/
-```
-
-3. Create a tunnel config file (use the provided template `.cloudflared/config.yml.template`):
-
-```yaml
-# .cloudflared/config.yml (example)
-tunnel: <TUNNEL-UUID>
-credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
-ingress:
-  - hostname: n8n.lation.com.mx
-    service: http://n8n:5678
-  - service: http_status: 404
-```
-
-4. Start the `cloudflared` container (the service mounts `.cloudflared` at `/etc/cloudflared`):
-
-```bash
-docker compose up -d cloudflared n8n
+docker compose up -d
 docker compose logs -f cloudflared
 ```
 
-5. In the Cloudflare dashboard DNS for `lation.com.mx` create a CNAME for the hostname you want to expose (for example `n8n`) and point it to the tunnel target shown by `cloudflared` (usually `<tunnel-uuid>.cfargotunnel.com`). Follow the Cloudflare docs for mapping a tunnel to a hostname if you prefer the UI.
-
-6. Update your `.env` so n8n builds stable webhook URLs (example):
+6. Confirm n8n URL settings in `.env`:
 
 ```env
 N8N_PROTOCOL=https
-N8N_HOST=n8n.lation.com.mx
+N8N_HOST=n8n-admin.lation.com.mx
+N8N_EDITOR_BASE_URL=https://n8n-admin.lation.com.mx
+N8N_PROXY_HOPS=1
 WEBHOOK_URL=https://n8n.lation.com.mx/
 ```
 
-Security notes:
-- Keep `.cloudflared/` and credentials out of git (this repo already gitignores `.cloudflared`).
-- Protect `n8n.lation.com.mx` with Cloudflare Access (Zero Trust) and keep n8n basic auth enabled for defense-in-depth.
-- Avoid exposing database ports (Postgres) to the public host in production.
+### Access + Security Model
 
-See `.cloudflared/config.yml.template` for a starting config. Do NOT commit your actual credentials JSON into the repository.
+- Create a Cloudflare Access app for `n8n-admin.lation.com.mx/*`.
+- Leave webhook paths reachable on `n8n.lation.com.mx` for integrations.
+- Add WAF/custom rules on `n8n.lation.com.mx` to allow `/webhook*` and `/webhook-test*` while blocking non-webhook paths.
+- Keep n8n basic auth enabled for defense-in-depth.
 
 ## Development Setup
 
