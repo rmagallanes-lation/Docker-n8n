@@ -18,3 +18,9 @@ data/
 # Temporary files
 *.tmp
 *.temp
+
+# Cloudflared tunnel credentials/config (do NOT commit)
+.cloudflared/
+
+# Local backup archives
+backups/

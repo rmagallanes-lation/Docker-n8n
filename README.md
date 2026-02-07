@@ -50,45 +50,47 @@ This project provides a containerized environment for building AI-powered workfl
    - Ollama API: http://localhost:11434
 
 ## Cloudflare Tunnel
+This stack uses a token-based Cloudflare Tunnel via Docker (`cloudflared`) to publish n8n with two hostnames:
 
-Quick tunnel creates a temporary, short-lived public URL that forwards traffic to your local n8n instance — great for testing webhooks but not for production (URLs change on restart).
+- `n8n-admin.lation.com.mx` -> n8n editor/login (protect with Cloudflare Access + n8n basic auth)
+- `n8n.lation.com.mx` -> n8n webhook endpoint host (public for webhook traffic)
 
-### Install
-- macOS (install Docker + cloudflared in one line)
-```bash
-brew install --cask docker && brew install cloudflared
-```
-- Linux (download binary)
-```bash
-curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared && chmod +x cloudflared && sudo mv cloudflared /usr/local/bin/
-```
+### Setup Steps (Cloudflare Dashboard + Docker)
 
-### Start stack & view cloudflared logs
-```bash
-# start the docker stack
-docker compose up -d
+1. Create a new tunnel in Cloudflare Zero Trust (recommended name: `n8n-lation-prod`).
+2. Choose Docker connector and copy the generated token.
+3. Configure public hostnames in the tunnel:
+   - `n8n-admin.lation.com.mx` -> `http://n8n:5678`
+   - `n8n.lation.com.mx` -> `http://n8n:5678`
+4. Put the token in `.env`:
 
-# view cloudflared logs (service name: cloudflared)
-docker compose logs -f cloudflared
-```
-
-### Run cloudflared
-- Locally (quick tunnel; returns a temporary public URL)
-```bash
-cloudflared tunnel --url http://localhost:5678
-```
-- With docker-compose (if a `cloudflared` service is defined)
-```bash
-docker compose up -d cloudflared
-docker compose logs -f cloudflared
-```
-
-### .env & webhooks
-- Set `N8N_HOST=localhost` in your `.env` so n8n builds webhook URLs for the local host:
 ```env
-N8N_HOST=localhost
+CF_TUNNEL_TOKEN=replace_with_cloudflare_tunnel_token
 ```
-- Note: quick tunnels are ephemeral — webhook URLs change when the tunnel restarts. Use a persistent Cloudflare Tunnel (authenticated tunnel) for stable webhook endpoints in production.
+
+5. Start services:
+
+```bash
+docker compose up -d
+docker compose logs -f cloudflared
+```
+
+6. Confirm n8n URL settings in `.env`:
+
+```env
+N8N_PROTOCOL=https
+N8N_HOST=n8n-admin.lation.com.mx
+N8N_EDITOR_BASE_URL=https://n8n-admin.lation.com.mx
+N8N_PROXY_HOPS=1
+WEBHOOK_URL=https://n8n.lation.com.mx/
+```
+
+### Access + Security Model
+
+- Create a Cloudflare Access app for `n8n-admin.lation.com.mx/*`.
+- Leave webhook paths reachable on `n8n.lation.com.mx` for integrations.
+- Add WAF/custom rules on `n8n.lation.com.mx` to allow `/webhook*` and `/webhook-test*` while blocking non-webhook paths.
+- Keep n8n basic auth enabled for defense-in-depth.
 
 ## Development Setup
 
